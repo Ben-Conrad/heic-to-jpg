@@ -1,0 +1,151 @@
+<Window x:Class="HeicToJpg.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:HeicToJpg.App.ViewModels"
+        xmlns:conv="clr-namespace:HeicToJpg.App.Converters"
+        Title="HEIC to JPG Converter"
+        Height="560" Width="820"
+        MinHeight="480" MinWidth="680"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
+
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+        <conv:InverseBoolConverter x:Key="InverseBool" />
+
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:FileConversionStatus.Success}">
+                    <Setter Property="Foreground" Value="#2E7D32" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:FileConversionStatus.Failed}">
+                    <Setter Property="Foreground" Value="#C62828" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:FileConversionStatus.Converting}">
+                    <Setter Property="Foreground" Value="#EF6C00" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:FileConversionStatus.Pending}">
+                    <Setter Property="Foreground" Value="Gray" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About" Click="AboutMenuItem_Click" />
+            </MenuItem>
+        </Menu>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="260" />
+            </Grid.ColumnDefinitions>
+
+            <!-- File list / drop zone -->
+            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="10,8" LastChildFill="False">
+                        <TextBlock Text="Files" FontWeight="Bold" VerticalAlignment="Center" DockPanel.Dock="Left" />
+                        <Button Content="Clear" Margin="8,0,0,0" Padding="8,2" DockPanel.Dock="Right"
+                                Command="{Binding ClearFilesCommand}" />
+                        <Button Content="Add Files..." Padding="8,2" DockPanel.Dock="Right"
+                                Command="{Binding AddFilesCommand}" />
+                    </DockPanel>
+
+                    <Grid Grid.Row="1">
+                        <TextBlock Text="Drag and drop HEIC files or folders here"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="Gray" FontSize="14"
+                                   Visibility="{Binding HasFiles, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                        <ListView ItemsSource="{Binding Files}" Margin="4" BorderThickness="0">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="File" Width="300" DisplayMemberBinding="{Binding FileName}" />
+                                    <GridViewColumn Header="Status" Width="100">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Status}" Style="{StaticResource StatusTextStyle}" />
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="Detail" Width="180" DisplayMemberBinding="{Binding DetailText}" />
+                                    <GridViewColumn Header="" Width="70">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="Remove" Padding="4,0"
+                                                        Command="{Binding DataContext.RemoveFileCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}" />
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Options panel -->
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="JPEG Quality" FontWeight="Bold" Margin="0,0,0,4" />
+                <DockPanel Margin="0,0,0,12">
+                    <TextBlock Text="{Binding JpegQuality}" Width="30" DockPanel.Dock="Right" />
+                    <Slider Minimum="1" Maximum="100" Value="{Binding JpegQuality}" TickFrequency="10" IsSnapToTickEnabled="False" />
+                </DockPanel>
+
+                <TextBlock Text="Output Location" FontWeight="Bold" Margin="0,0,0,4" />
+                <RadioButton Content="Same folder as source" IsChecked="{Binding UseCustomOutputFolder, Converter={StaticResource InverseBool}}" Margin="0,0,0,4" />
+                <RadioButton Content="Custom folder" IsChecked="{Binding UseCustomOutputFolder}" Margin="0,0,0,4" />
+                <DockPanel Margin="0,0,0,12" IsEnabled="{Binding UseCustomOutputFolder}">
+                    <Button Content="Browse..." DockPanel.Dock="Right" Padding="6,2" Command="{Binding BrowseOutputFolderCommand}" />
+                    <TextBox Text="{Binding CustomOutputFolder}" Margin="0,0,6,0" IsReadOnly="True" />
+                </DockPanel>
+
+                <TextBlock Text="File Naming" FontWeight="Bold" Margin="0,0,0,4" />
+                <CheckBox Content="Add suffix to file name" IsChecked="{Binding AddSuffix}" Margin="0,0,0,4" />
+                <TextBox Text="{Binding Suffix}" IsEnabled="{Binding AddSuffix}" Margin="0,0,0,12" />
+
+                <CheckBox Content="Overwrite existing files" IsChecked="{Binding OverwriteExisting}" Margin="0,0,0,12" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Bottom bar -->
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <ProgressBar Grid.Row="0" Height="8" Minimum="0" Maximum="{Binding ProgressMax}" Value="{Binding ProgressValue}" Margin="0,0,0,8" />
+
+            <DockPanel Grid.Row="1">
+                <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" DockPanel.Dock="Left" Foreground="#555555" />
+                <Button Content="Cancel" DockPanel.Dock="Right" Padding="16,6" Margin="8,0,0,0"
+                        Visibility="{Binding IsConverting, Converter={StaticResource BoolToVisibility}}"
+                        Command="{Binding CancelConvertCommand}" />
+                <Button Content="Convert" DockPanel.Dock="Right" Padding="24,6" FontWeight="Bold"
+                        Command="{Binding ConvertCommand}" />
+            </DockPanel>
+        </Grid>
+    </Grid>
+    </DockPanel>
+</Window>
