@@ -20,6 +20,11 @@ that open everywhere. Built for non-technical users: drag files in, hit Convert,
 Grab the latest installer (`HeicToJpgSetup.exe`) from the [Releases](../../releases)
 page. It installs to your user profile — no admin prompt, no system-wide changes.
 
+**Note:** Windows will likely show a "Windows protected your PC" SmartScreen warning
+with "Unknown publisher" when you run the installer. This is expected — the installer
+isn't code-signed, so Windows doesn't yet recognize it as safe. To proceed, click
+**"More info"**, then **"Run anyway."**
+
 ## Requirements
 
 - Windows 10 or 11, 64-bit
