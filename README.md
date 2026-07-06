@@ -4,6 +4,8 @@ A free Windows desktop app for converting `.HEIC`/`.HEIF` photos — the format 
 and some Android/Google Photos exports use by default — into standard `.JPG` files
 that open everywhere. Built for non-technical users: drag files in, hit Convert, done.
 
+![HEIC to JPG Converter screenshot](docs/screenshot.png)
+
 ## Features
 
 - Drag-and-drop or file picker, single files or whole folders
