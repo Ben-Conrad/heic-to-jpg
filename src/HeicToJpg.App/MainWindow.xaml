@@ -4,6 +4,7 @@
         xmlns:vm="clr-namespace:HeicToJpg.App.ViewModels"
         xmlns:conv="clr-namespace:HeicToJpg.App.Converters"
         Title="HEIC to JPG Converter"
+        Icon="Assets/icon.ico"
         Height="560" Width="820"
         MinHeight="480" MinWidth="680"
         AllowDrop="True"

@@ -14,6 +14,8 @@ that open everywhere. Built for non-technical users: drag files in, hit Convert,
 - EXIF metadata (camera info, date taken, GPS, etc.) preserved in the output
 - Choose to save alongside the originals or to a custom folder, with optional filename suffix
 - Installs per-user, no administrator rights required
+- Optional "Send To" shortcut — select one or more `.HEIC`/`.HEIF` files in Explorer,
+  right-click, and send them straight to the app to convert
 
 ## Download
 

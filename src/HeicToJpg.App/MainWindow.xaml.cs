@@ -14,6 +14,11 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
+    public void OpenFiles(IEnumerable<string> paths)
+    {
+        _viewModel.AddPaths(paths);
+    }
+
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
