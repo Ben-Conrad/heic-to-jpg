@@ -5,6 +5,9 @@ using LibHeifSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Metadata.Profiles.Exif;
+using SixLabors.ImageSharp.Metadata.Profiles.Icc;
+using SixLabors.ImageSharp.Metadata.Profiles.Iptc;
+using SixLabors.ImageSharp.Metadata.Profiles.Xmp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace HeicToJpg.Core;
@@ -71,12 +74,49 @@ public sealed class HeicConverter
 
         if (options.PreserveExif)
         {
-            ApplyExifMetadata(image, imageHandle);
+            ApplyMetadata(image, imageHandle);
         }
 
         var encoder = new JpegEncoder { Quality = Math.Clamp(options.JpegQuality, 1, 100) };
         image.Save(outputPath, encoder);
     }
+
+    // WIC's BitmapMetadata query paths are per-container-format: an object read from
+    // a HEIC frame is generally not valid for a JPEG encoder. Reusing it wholesale
+    // (as a prior version of this method did) doesn't reliably throw on mismatch -
+    // it can silently write no metadata at all. The cross-format "policy" queries
+    // below (System.Photo.*, System.GPS.*) are the WIC-supported way to move values
+    // between container formats, so we read through those and write a fresh,
+    // JPEG-scoped BitmapMetadata instead of transplanting the source object.
+    private static readonly string[] WicMetadataPolicyQueries =
+    {
+        "System.Photo.DateTaken",
+        "System.Photo.CameraManufacturer",
+        "System.Photo.CameraModel",
+        "System.Photo.Orientation",
+        "System.Photo.FNumber",
+        "System.Photo.ExposureTime",
+        "System.Photo.ExposureBias",
+        "System.Photo.FocalLength",
+        "System.Photo.ISOSpeed",
+        "System.Photo.Flash",
+        "System.Photo.MeteringMode",
+        "System.Photo.LensModel",
+        "System.Photo.LensManufacturer",
+        "System.Photo.WhiteBalance",
+        "System.Photo.FocalLengthInFilm",
+        "System.GPS.Latitude",
+        "System.GPS.LatitudeRef",
+        "System.GPS.Longitude",
+        "System.GPS.LongitudeRef",
+        "System.GPS.Altitude",
+        "System.GPS.AltitudeRef",
+        "System.Rating",
+        "System.Keywords",
+        "System.Title",
+        "System.Comment",
+        "System.Copyright",
+    };
 
     private static void ConvertWithWic(string sourcePath, string outputPath, ConversionOptions options)
     {
@@ -87,15 +127,52 @@ public sealed class HeicConverter
         var jpegEncoder = new JpegBitmapEncoder { QualityLevel = Math.Clamp(options.JpegQuality, 1, 100) };
 
         BitmapFrame frameToSave;
-        try
+        if (options.PreserveExif && sourceFrame.Metadata is BitmapMetadata sourceMetadata)
         {
-            frameToSave = options.PreserveExif
-                ? BitmapFrame.Create(sourceFrame, sourceFrame.Thumbnail, sourceFrame.Metadata as BitmapMetadata, sourceFrame.ColorContexts)
-                : BitmapFrame.Create(sourceFrame);
+            var jpegMetadata = new BitmapMetadata("jpg");
+            foreach (var query in WicMetadataPolicyQueries)
+            {
+                object? value;
+                try
+                {
+                    value = sourceMetadata.GetQuery(query);
+                }
+                catch (Exception)
+                {
+                    // Source codec doesn't support reading this tag via the policy query; skip it.
+                    continue;
+                }
+
+                if (value is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    jpegMetadata.SetQuery(query, value);
+                }
+                catch (Exception)
+                {
+                    // Target (jpg) codec rejected this tag's type/value; skip it, keep the rest.
+                }
+            }
+
+            // ColorContexts (ICC profile) are raw bytes, not per-container query paths,
+            // so they transfer directly rather than needing the policy-query treatment above.
+            try
+            {
+                frameToSave = BitmapFrame.Create(sourceFrame, sourceFrame.Thumbnail, jpegMetadata, sourceFrame.ColorContexts);
+            }
+            catch (Exception)
+            {
+                // Something about the assembled metadata/color context still isn't acceptable
+                // to the JPEG encoder as a whole; fall back to pixels-only rather than fail the file.
+                frameToSave = BitmapFrame.Create(sourceFrame);
+            }
         }
-        catch (NotSupportedException)
+        else
         {
-            // Some codecs don't support re-attaching metadata; fall back to pixels only.
             frameToSave = BitmapFrame.Create(sourceFrame);
         }
 
@@ -129,6 +206,14 @@ public sealed class HeicConverter
         return image;
     }
 
+    private static void ApplyMetadata(Image image, HeifImageHandle handle)
+    {
+        ApplyExifMetadata(image, handle);
+        ApplyXmpMetadata(image, handle);
+        ApplyIccProfile(image, handle);
+        ApplyIptcMetadata(image, handle);
+    }
+
     private static void ApplyExifMetadata(Image image, HeifImageHandle handle)
     {
         byte[] bytes;
@@ -142,16 +227,19 @@ public sealed class HeicConverter
             return;
         }
 
-        // The HEIF "Exif" metadata block starts with a 4-byte big-endian offset
-        // to the TIFF header, which precedes the actual Exif payload.
-        if (bytes is null || bytes.Length <= 4)
+        // LibHeifSharp's GetExifMetadata() already parses and strips the HEIF Exif
+        // item's leading 4-byte TIFF-header-offset field (see HeifImageHandle.cs in
+        // libheif-sharp) - these bytes start directly at the TIFF header. An earlier
+        // version of this method re-skipped 4 more bytes here, which cut off the
+        // byte-order mark and silently produced a 0-tag Exif profile for every file.
+        if (bytes is null || bytes.Length == 0)
         {
             return;
         }
 
         try
         {
-            var exifProfile = new ExifProfile(bytes[4..]);
+            var exifProfile = new ExifProfile(bytes);
 
             // libheif's default decode already applies any stored rotation/mirroring,
             // so the pixel data is physically upright. Leaving the original Orientation
@@ -163,6 +251,91 @@ public sealed class HeicConverter
         catch (ImageProcessingException)
         {
             // Malformed Exif block in the source file; skip metadata rather than fail the conversion.
+        }
+    }
+
+    private static void ApplyXmpMetadata(Image image, HeifImageHandle handle)
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = handle.GetXmpMetadata();
+        }
+        catch (HeifException)
+        {
+            // No XMP block present in the source file.
+            return;
+        }
+
+        if (bytes is null || bytes.Length == 0)
+        {
+            return;
+        }
+
+        image.Metadata.XmpProfile = new XmpProfile(bytes);
+    }
+
+    private static void ApplyIccProfile(Image image, HeifImageHandle handle)
+    {
+        HeifIccColorProfile? iccProfile;
+        try
+        {
+            iccProfile = handle.IccColorProfile;
+        }
+        catch (HeifException)
+        {
+            return;
+        }
+
+        if (iccProfile is null)
+        {
+            return;
+        }
+
+        image.Metadata.IccProfile = new IccProfile(iccProfile.GetIccProfileBytes());
+    }
+
+    private static void ApplyIptcMetadata(Image image, HeifImageHandle handle)
+    {
+        IReadOnlyList<HeifItemId> blockIds;
+        try
+        {
+            blockIds = handle.GetMetadataBlockIds(null!, null!);
+        }
+        catch (HeifException)
+        {
+            return;
+        }
+
+        foreach (var id in blockIds)
+        {
+            HeifMetadataBlockInfo info;
+            try
+            {
+                info = handle.GetMetadataBlockInfo(id);
+            }
+            catch (HeifException)
+            {
+                continue;
+            }
+
+            if (!string.Equals(info.ItemType, "iptc", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                var bytes = handle.GetMetadata(id);
+                if (bytes is { Length: > 0 })
+                {
+                    image.Metadata.IptcProfile = new IptcProfile(bytes);
+                }
+            }
+            catch (HeifException)
+            {
+                // Malformed IPTC block; skip rather than fail the conversion.
+            }
         }
     }
 

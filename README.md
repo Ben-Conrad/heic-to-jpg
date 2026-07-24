@@ -11,7 +11,7 @@ that open everywhere. Built for non-technical users: drag files in, hit Convert,
 - Drag-and-drop or file picker, single files or whole folders
 - Batch conversion with progress tracking and cancel support
 - Adjustable JPEG quality
-- EXIF metadata (camera info, date taken, GPS, etc.) preserved in the output
+- Original metadata (camera info, date taken, GPS, color profile) carried over to the JPEG
 - Choose to save alongside the originals or to a custom folder, with optional filename suffix
 - Installs per-user, no administrator rights required
 - Optional "Send To" shortcut — select one or more `.HEIC`/`.HEIF` files in Explorer,
