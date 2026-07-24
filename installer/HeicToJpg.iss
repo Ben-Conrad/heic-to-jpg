@@ -4,8 +4,8 @@
 ; Then compile: ISCC installer\HeicToJpg.iss
 
 #define MyAppName "HEIC to JPG Converter"
-#define MyAppVersion "1.2"
-#define MyAppVersionInfo "1.2.0.0"
+#define MyAppVersion "1.3"
+#define MyAppVersionInfo "1.3.0.0"
 #define MyAppPublisher "Ben Conrad"
 #define MyAppExeName "HeicToJpg.exe"
 #define MyPublishDir "..\publish\win-x64"
