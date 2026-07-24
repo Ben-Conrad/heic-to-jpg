@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Media.Imaging;
 using LibHeifSharp;
@@ -74,7 +75,7 @@ public sealed class HeicConverter
 
         if (options.PreserveExif)
         {
-            ApplyMetadata(image, imageHandle);
+            ApplyMetadata(image, imageHandle, options);
         }
 
         var encoder = new JpegEncoder { Quality = Math.Clamp(options.JpegQuality, 1, 100) };
@@ -130,7 +131,11 @@ public sealed class HeicConverter
         if (options.PreserveExif && sourceFrame.Metadata is BitmapMetadata sourceMetadata)
         {
             var jpegMetadata = new BitmapMetadata("jpg");
-            foreach (var query in WicMetadataPolicyQueries)
+            var queries = options.PreserveGps
+                ? WicMetadataPolicyQueries
+                : WicMetadataPolicyQueries.Where(q => !q.StartsWith("System.GPS.", StringComparison.Ordinal));
+
+            foreach (var query in queries)
             {
                 object? value;
                 try
@@ -206,15 +211,15 @@ public sealed class HeicConverter
         return image;
     }
 
-    private static void ApplyMetadata(Image image, HeifImageHandle handle)
+    private static void ApplyMetadata(Image image, HeifImageHandle handle, ConversionOptions options)
     {
-        ApplyExifMetadata(image, handle);
+        ApplyExifMetadata(image, handle, options);
         ApplyXmpMetadata(image, handle);
         ApplyIccProfile(image, handle);
         ApplyIptcMetadata(image, handle);
     }
 
-    private static void ApplyExifMetadata(Image image, HeifImageHandle handle)
+    private static void ApplyExifMetadata(Image image, HeifImageHandle handle, ConversionOptions options)
     {
         byte[] bytes;
         try
@@ -245,6 +250,19 @@ public sealed class HeicConverter
             // so the pixel data is physically upright. Leaving the original Orientation
             // tag in place would cause viewers to rotate an already-correct image again.
             exifProfile.RemoveValue(ExifTag.Orientation);
+
+            if (!options.PreserveGps)
+            {
+                var gpsTags = exifProfile.Values
+                    .Where(v => v.Tag.ToString().StartsWith("Gps", StringComparison.OrdinalIgnoreCase))
+                    .Select(v => v.Tag)
+                    .ToList();
+
+                foreach (var tag in gpsTags)
+                {
+                    exifProfile.RemoveValue(tag);
+                }
+            }
 
             image.Metadata.ExifProfile = exifProfile;
         }

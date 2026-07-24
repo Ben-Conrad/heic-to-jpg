@@ -126,6 +126,9 @@
                 <TextBox Text="{Binding Suffix}" IsEnabled="{Binding AddSuffix}" Margin="0,0,0,12" />
 
                 <CheckBox Content="Overwrite existing files" IsChecked="{Binding OverwriteExisting}" Margin="0,0,0,12" />
+
+                <CheckBox Content="Keep GPS location data" IsChecked="{Binding PreserveGps}" Margin="0,0,0,12"
+                          ToolTip="Uncheck to strip GPS coordinates from the converted JPG while keeping other metadata (camera, date, etc.)" />
             </StackPanel>
         </Grid>
 

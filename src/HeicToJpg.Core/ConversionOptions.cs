@@ -26,5 +26,7 @@ public sealed class ConversionOptions
 
     public bool PreserveExif { get; init; } = true;
 
+    public bool PreserveGps { get; init; } = true;
+
     public bool OverwriteExisting { get; init; } = false;
 }

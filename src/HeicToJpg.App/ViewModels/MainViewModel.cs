@@ -35,6 +35,9 @@ public partial class MainViewModel : ObservableObject
     private bool overwriteExisting;
 
     [ObservableProperty]
+    private bool preserveGps = true;
+
+    [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConvertCommand))]
     private bool isConverting;
 
@@ -146,6 +149,7 @@ public partial class MainViewModel : ObservableObject
             Naming = AddSuffix ? NamingMode.AddSuffix : NamingMode.KeepOriginalName,
             Suffix = Suffix,
             OverwriteExisting = OverwriteExisting,
+            PreserveGps = PreserveGps,
         };
 
         var pathToItem = Files.ToDictionary(f => f.FilePath);
