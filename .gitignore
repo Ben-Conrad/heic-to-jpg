@@ -5,3 +5,6 @@ obj/
 publish/
 dist/
 .claude/
+
+# Real GPS-tagged sample photos stay local-only - never published to the public repo.
+src/HEIC-File-Samples/**/*-gps.HEIC
